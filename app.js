@@ -1,9 +1,39 @@
 const express = require('express');
 const puppeteer = require('puppeteer');
+const cors = require('cors');
+const morgan = require('morgan');
 
 const app = express();
+app.use(cors());
+app.use(morgan('combined'));
+app.use((req, res, next) => {
+  console.log(req.body);
+  next();
+});
+
+app.use((req, res, next) => {
+  res.setHeader(
+    "Access-Control-Allow-Origin",
+    "*"
+  );
+  res.setHeader(
+    "Access-Control-Allow-Methods",
+    "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS,CONNECT,TRACE"
+  );
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization, X-Content-Type-Options, Accept, X-Requested-With, Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
+  );
+  res.setHeader("Access-Control-Allow-Credentials", true);
+  res.setHeader("Access-Control-Allow-Private-Network", true);
+  //  Firefox caps this at 24 hours (86400 seconds). Chromium (starting in v76) caps at 2 hours (7200 seconds). The default value is 5 seconds.
+  res.setHeader("Access-Control-Max-Age", 7200);
+
+  next();
+});
 
 app.post('/', express.json(), async (req, res) => {
+  console.log(req.body);
 
     const { url, secretKey } = req.body;
 
@@ -31,8 +61,8 @@ app.post('/', express.json(), async (req, res) => {
 
         const result = {};
 
-        const idElement = await page.$('link[rel="canonical"]');
-        result.id = idElement ? await page.evaluate(el => el.href.split('/').pop(), idElement) : 'Element not found';
+        const   urlElement = await page.$('link[rel="canonical"]');
+        result.  url =   urlElement ? await page.evaluate(el => el.href.split('?').pop(),   urlElement) : 'Element not found';
         const authorScriptElement = await page.$('script[type="application/ld+json"]');
         const authorScriptContent = authorScriptElement ? await page.evaluate(el => JSON.parse(el.textContent), authorScriptElement) : null;
         result.author = authorScriptContent ? authorScriptContent.author.name : 'Element not found';
@@ -47,7 +77,7 @@ app.post('/', express.json(), async (req, res) => {
         });
 
         result.images = await page.$$eval('.feed-images-content img', imgs => {
-            return imgs.map(img => img.src)
+            return imgs.map(img => img.src).filter(src => src !== '');
         });
 
         const reactionsElement = await page.$('span[data-test-id="social-actions__reaction-count"]');
@@ -61,6 +91,7 @@ app.post('/', express.json(), async (req, res) => {
         await browser.close();
 
         res.json(result);
+        console.log(result);
     } catch (error) {
         res.status(500).json({ error: 'An error occurred.', details: error.message });
     }
